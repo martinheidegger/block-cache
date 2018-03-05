@@ -25,6 +25,7 @@
   "devDependencies": {
     "bluebird": "^3.5.1",
     "hyperdrive": "^9.12.3",
+    "random-access-http": "^2.0.0",
     "random-access-memory": "^2.4.0",
     "standard": "^11.0.0",
     "standard-version": "^4.3.0",
