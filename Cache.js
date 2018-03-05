@@ -47,7 +47,9 @@ class Cache {
           fileOpts = Object.assign({
             blkSize: cacheOpts.blkSize
           }, fileOpts)
-          return new CachedFile(internal, path, fileOpts)
+          const file = new CachedFile(internal, path, fileOpts)
+          Object.freeze(file)
+          return file
         },
         enumerable: false
       }

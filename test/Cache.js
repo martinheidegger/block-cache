@@ -63,6 +63,16 @@ test('default cache size', t => {
     testSize(Cache.DEFAULT_CACHE_SIZE + 1, false)
   ])
 })
+
+test('cached files are frozen', t =>
+  createDrive([{ name: 'hello', data: 'world' }])
+    .then(drive => {
+      const c = new Cache(drive)
+      return c.open('hello')
+        .then(fp => t.equals(Object.isFrozen(fp), true))
+    })
+)
+
 test('convenience API: createReadStream', t =>
   createDrive([{ name: 'hello', data: 'world' }])
     .then(drive => {
