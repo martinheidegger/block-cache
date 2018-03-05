@@ -259,7 +259,7 @@ through [`fs.stat`](https://nodejs.org/api/fs.html#fs_class_fs_stats).
 CachedFile.DEFAULT_BLK_SIZE
 ```
 
-The default blk size used for caching.
+The default `opts.blkSize` used for caching: 512 (integer, equals 512 Byte).
 
 ## License
 
