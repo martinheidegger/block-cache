@@ -1,4 +1,4 @@
-# Hello There!
+# Hello There
 
 Thank you for showing interest in contributing to this library!
 You are welcome to send [PRs](https://help.github.com/articles/about-pull-requests/)
@@ -9,4 +9,4 @@ Please make sure that you run the tests with `npm test`.
 If you have any questions or found any bugs, please let me know by
 posting an [issue](https://github.com/martinheidegger/block-cache/issues/new), thanks!
 
-_Please be kind._
+Please be kind.

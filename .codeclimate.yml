@@ -2,5 +2,9 @@ engines:
   markdownlint:
     enabled: true
     checks:
+      # Html for anchors!
       MD033:
+        enabled: false
+      # indentation for lists (works fine with github)
+      MD007:
         enabled: false
