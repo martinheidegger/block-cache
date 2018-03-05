@@ -1,16 +1,17 @@
 'use strict'
 const err = require('./lib/err')
-const megaByte10 = (10 * 1024 * 1024)
 const createLRUCache = require('lru-cache')
 const CachedFile = require('./CachedFile')
 const promisifyAsync = require('./lib/promisifyAsync')
+const DEFAULT_CACHE_SIZE = (10 * 1024 * 1024)
 
-module.exports = class Cache {
+class Cache {
   constructor (fs, cacheOpts) {
     if (!fs) throw err('ERR_INVALID_ARG_TYPE', 'fs option required, this package doesnt assume which fs you want to use, see: hyperdrive')
 
     cacheOpts = Object.assign({
-      cacheSize: megaByte10,
+      cacheSize: DEFAULT_CACHE_SIZE,
+      prefix: ''
     }, cacheOpts)
 
     if (!cacheOpts.cache) {
@@ -88,3 +89,6 @@ module.exports = class Cache {
     return fd.read(buffer, offset, length, position, cb)
   }
 }
+Cache.DEFAULT_CACHE_SIZE = DEFAULT_CACHE_SIZE
+
+module.exports = Cache

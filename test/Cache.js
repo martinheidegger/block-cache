@@ -29,6 +29,40 @@ test('creating a reader requires a path', t => {
   }
 })
 
+test('default cache size', t => {
+  t.equals(Cache.DEFAULT_CACHE_SIZE, 10 * 1024 * 1024)
+  const c = new Cache({
+    read (fp, buffer, position, length, start, cb) {
+      cb(null, buffer)
+    }
+  })
+  const fp = {}
+  const testSize = (size, smallEnough) => {
+    return new Promise((resolve, reject) => {
+      c._readCached(fp, '', 0, size, (err, a) => {
+        if (err) return reject(err)
+        c._readCached(fp, '', 0, size, (err, b) => {
+          if (err) return reject(err)
+
+          if (a !== b) {
+            if (smallEnough) {
+              return reject(new Error(`${size} is supposed to be small enough to be cached by default but wasnt`))
+            }
+          } else {
+            if (!smallEnough) {
+              return reject(new Error(`${size} is supposed to be too big to be cached by default but was`))
+            }
+          }
+          resolve()
+        })
+      })
+    })
+  }
+  return Promise.all([
+    testSize(Cache.DEFAULT_CACHE_SIZE, true),
+    testSize(Cache.DEFAULT_CACHE_SIZE + 1, false)
+  ])
+})
 test('convenience API: createReadStream', t =>
   createDrive([{ name: 'hello', data: 'world' }])
     .then(drive => {

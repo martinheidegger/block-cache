@@ -19,7 +19,7 @@ suitable as a Sandbox.
 
 The API of `block-cache` is comparable to the
 [`fs`](https://nodejs.org/api/fs.html) API but all callbacks are optional and
-if omitted will result in a promise returned.
+if omitted will result in a Promise returned.
 
 Here is a simple example of reading a file into the local cache.
 
@@ -78,6 +78,7 @@ the file, the second operation can already use it from the cached data.
     - [`.openSync`](#cache.openSync)
     - [`.read`](#cache.read)
     - [`.createReadStream`](#cache.createReadStream)
+    - [`DEFAULT_CACHE_SIZE`](#Cache.DEFAULT_CACHE_SIZE)
 - [`CachedFile`](#CachedFile)
     - [`.read`](#cachedFile.read)
     - [`.createReadStream`](#cachedFile.createReadStream)
@@ -98,7 +99,8 @@ new Cache(fs[, opts])
 - `opts.cache` is a [`lru-cache`](https://github.com/isaacs/node-lru-cache)
     instance (object, optional).
 - `opts.cacheSize` is the size of the lru-cache to be created in case a
-    `opts.cache` is missing. 10MB by default (integer).
+    `opts.cache` is missing. Defaults to
+    [`Cache.DEFAULT_CACHE_SIZE`](#Cache.DEFAULT_CACHE_SIZE) (integer).
 - `opts.blkSize` is the default size in bytes of a cache-block. Defaults to
     [`CachedFile.DEFAULT_BLK_SIZE`](#CachedFile.DEFAULT_BLK_SIZE). (integer).
 
@@ -170,6 +172,15 @@ through a stream.
 - `opts.start` is the start from while to read the file. Defaults to 0. (integer)
 - `opts.end` is the end until which to read the file. Defaults to the end of
     the file. (integer)
+
+<a name="Cache.DEFAULT_CACHE_SIZE"></a>
+
+```javascript
+Cache.DEFAULT_CACHE_SIZE
+```
+
+The default size of a cache created if `opts.cache` is not passed in: 10485760
+(integer, equals 10 MegaByte)
 
 ---
 
