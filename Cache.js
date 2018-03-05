@@ -5,6 +5,34 @@ const CachedFile = require('./CachedFile')
 const promisifyAsync = require('./lib/promisifyAsync')
 const DEFAULT_CACHE_SIZE = (10 * 1024 * 1024)
 
+function wrapFs (fs, cacheOpts) {
+  return {
+    open (path, opts, cb) {
+      fs.open(path, opts, cb)
+    },
+    stat (path, cb) {
+      fs.stat(path, cb)
+    },
+    close (path, cb) {
+      fs.close(path, cb)
+    },
+    read (fp, prefix, start, end, cb) {
+      const key = `${cacheOpts.prefix}${prefix}${start}:${end}`
+      const cached = cacheOpts.cache.get(key)
+      if (cached) {
+        return cb(null, cached)
+      }
+      const size = end - start
+      const buffer = Buffer.allocUnsafe(size)
+      fs.read(fp, buffer, 0, size, start, err => {
+        if (err) return cb(err)
+        cacheOpts.cache.set(key, buffer)
+        cb(null, buffer)
+      })
+    }
+  }
+}
+
 class Cache {
   constructor (fs, cacheOpts) {
     if (!fs) throw err('ERR_INVALID_ARG_TYPE', 'fs option required, this package doesnt assume which fs you want to use, see: hyperdrive')
@@ -21,24 +49,11 @@ class Cache {
       })
     }
 
-    const read = (fp, prefix, start, end, cb) => {
-      const key = `${cacheOpts.prefix}${prefix}${start}:${end}`
-      const cached = cacheOpts.cache.get(key)
-      if (cached) {
-        return cb(null, cached)
-      }
-      const size = end - start
-      const buffer = Buffer.allocUnsafe(size)
-      fs.read(fp, buffer, 0, size, start, err => {
-        if (err) return cb(err)
-        cacheOpts.cache.set(key, buffer)
-        cb(null, buffer)
-      })
-    }
+    const internal = wrapFs(fs, cacheOpts)
 
     Object.defineProperties(this, {
       _readCached: {
-        value: read,
+        value: internal.read,
         enumerable: false
       },
       openSync: {
@@ -54,19 +69,6 @@ class Cache {
         enumerable: false
       }
     })
-
-    const internal = {
-      open (path, opts, cb) {
-        fs.open(path, opts, cb)
-      },
-      stat (path, cb) {
-        fs.stat(path, cb)
-      },
-      close (path, cb) {
-        fs.close(path, cb)
-      },
-      read
-    }
   }
 
   open (path, opts, cb) {

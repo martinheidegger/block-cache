@@ -14,96 +14,91 @@ function sizeForStat (stat) {
   return stat.blkSize * stat.blocks
 }
 
-function getSafeSize (start, end, size) {
-  let safeStart = start
-  if (start === -1 || start === undefined || start === null) {
-    safeStart = 0
+function setterGetter (initial) {
+  let value = initial
+  return {
+    get: () => value,
+    set: newValue => { value = newValue }
   }
-  let safeEnd = end
-  if (end === -1 || end === undefined || end === null) {
-    safeEnd = size
+}
+
+function property (value) {
+  return { value }
+}
+
+function trimBlock (data, index, range, block) {
+  let rightCut = block.size
+  let leftCut = 0
+  if (index === range.lastIndex) {
+    rightCut = block.size - (block.end - range.end)
   }
-  return {start: safeStart, end: safeEnd, size: safeEnd - safeStart}
+  if (index === range.firstIndex) {
+    leftCut = range.start - block.start
+  }
+  if (leftCut > 0 || rightCut < block.size) {
+    // TODO: Data.slice creates a new Buffer, which is unnecessary
+    // for `read` but neccesseary for `readStream` maybe can be split?
+    data = data.slice(leftCut, rightCut)
+  }
+  return data
 }
 
 class CachedFile {
   constructor (internal, path, opts) {
-    const fp = mem.promise(cb => internal.open(path, 'r', cb))
+    let isClosed = false
+    let closeCb
+    let reading = 0
     const init = mem.props({
-      fp,
-      prefix: mem.promise(cb => this.stat((err, stat) => {
+      fp: cb => internal.open(path, 'r', cb),
+      prefix: cb => this.stat((err, stat) => {
         if (err) return cb(err)
         cb(null, `${path}:${stat.mtime.getTime().toString(32)}:`)
-      }))
+      })
     })
-    let position = 0
-    let _isClosed = false
     Object.defineProperties(this, {
-      blkSize: {
-        value: (opts && opts.blkSize) || CachedFile.DEFAULT_BLK_SIZE
-      },
-      position: {
-        get: () => position,
-        set: (pos) => { position = pos }
-      },
-      _isClosed: {
-        get: () => _isClosed
-      },
-      stat: {
-        value: mem.promise(cb => internal.stat(path, cb))
-      },
-      size: {
-        value: mem.promise(cb => this.stat((err, stat) => {
+      _isClosed: { get: () => isClosed },
+      position: setterGetter(0),
+      blkSize: property((opts && opts.blkSize) || CachedFile.DEFAULT_BLK_SIZE),
+      close: mem.property(cb => {
+        isClosed = true
+        init((err, parts) => {
           if (err) return cb(err)
-          cb(null, sizeForStat(stat))
-        }))
-      }
-    })
-    let reading = 0
-    let closer
-    this._readCached = (rangeStart, rangeEnd, cb) => {
-      init((error, parts) => {
+          closeCb = () => internal.close(parts.fp, cb)
+          if (reading === 0) {
+            closeCb()
+          }
+        })
+      }),
+      stat: mem.property(cb => internal.stat(path, cb)),
+      size: mem.property(cb => this.stat((err, stat) => {
+        if (err) return cb(err)
+        cb(null, sizeForStat(stat))
+      })),
+      _readCached: property((block, cb) => init((error, parts) => {
         if (error) return cb(error)
-        if (closer !== undefined) return cb(err('ERR_CLOSED', `File pointer has been closed.`))
+        if (isClosed) return cb(err('ERR_CLOSED', `File pointer has been closed.`))
         reading++
-        internal.read(parts.fp, parts.prefix, rangeStart, rangeEnd, (err, data) => {
+        internal.read(parts.fp, parts.prefix, block.start, block.end, (err, data) => {
           reading--
-          if (closer !== undefined) closer()
+          if (closeCb !== undefined && reading === 0) closeCb()
           cb(err, data)
         })
-      })
-    }
-    this.close = mem.promise(cb => {
-      _isClosed = true
-      fp((err, fp) => {
-        if (err) return cb(err)
-        const noReader = () => {
-          internal.close(fp, cb)
-        }
-        const check = () => {
-          if (reading === 0) {
-            closer = () => {}
-            noReader()
-          }
-        }
-        closer = check
-        check()
-      })
+      }))
     })
   }
 
-  getRange (rangeIndex, size) {
-    let rangeStart = rangeIndex * this.blkSize
-    let rangeEnd = rangeStart + this.blkSize
-    let rangeSize = this.blkSize
-    if (rangeEnd > size) {
-      rangeEnd = size
-      rangeSize = size - rangeStart
+  _getBlock (blkIndex, total) {
+    let size = this.blkSize
+    let start = blkIndex * size
+    let end = start + size
+    if (end > total) {
+      end = total
+      size = total - start
     }
-    return {rangeStart, rangeEnd, rangeSize}
+    return {start, end, size}
   }
 
-  _readRange (start, end, process, cb) {
+  _getSafeRange (start, end, cb) {
     this.size((error, size) => {
       if (error) return cb(error)
       if (start < 0 || end > size) {
@@ -112,42 +107,43 @@ class CachedFile {
       if (end !== null && end !== undefined && end < start) {
         return cb(err('ERR_RANGE', `Invalid Range: start(${start}) is after end(${end})`))
       }
-      const safe = getSafeSize(start, end, size)
-      if (safe.size === 0) {
-        return cb(null, Buffer.allocUnsafe(0), 0, safe)
+      if (start === -1 || start === undefined || start === null) {
+        start = 0
       }
-      const firstIndex = safe.start / this.blkSize | 0
-      const lastIndex = (safe.end - 1) / this.blkSize | 0
+      if (end === -1 || end === undefined || end === null) {
+        end = size
+      }
+      cb(null, {
+        start,
+        end,
+        size: end - start,
+        total: size,
+        firstIndex: start / this.blkSize | 0,
+        lastIndex: (end - 1) / this.blkSize | 0
+      })
+    })
+  }
+
+  _readRange (start, end, process, cb) {
+    this._getSafeRange(start, end, (error, range) => {
+      if (error) return cb(error)
+      if (range.total === 0) {
+        return cb(null, Buffer.allocUnsafe(0), 0)
+      }
       const nextRange = index => {
-        const range = this.getRange(index, size)
-        const rangeEnd = range.rangeEnd
-        const rangeStart = range.rangeStart
-        let rangeSize = range.rangeSize
-        this._readCached(rangeStart, rangeEnd, (err, data) => {
+        const block = this._getBlock(index, range.total)
+        this._readCached(block, (err, data) => {
           if (err) return cb(err)
-          let rightCut = rangeSize
-          let leftCut = 0
-          if (index === lastIndex) {
-            rightCut = rangeSize - (rangeEnd - safe.end)
-          }
-          if (index === firstIndex) {
-            leftCut = safe.start - rangeStart
-          }
-          if (leftCut > 0 || rightCut < rangeSize) {
-            // TODO: Data.slice creates a new Buffer, which is unnecessary
-            // for `read` but neccesseary for `readStream` maybe can be split?
-            data = data.slice(leftCut, rightCut)
-            rangeSize = rightCut - leftCut
-          }
-          if (index === lastIndex) {
-            return cb(null, data, rangeSize, safe)
+          data = trimBlock(data, index, range, block)
+          if (index === range.lastIndex) {
+            return cb(null, data, data.length)
           } else {
-            process(data, rangeSize, safe)
+            process(data, data.length, range)
             nextRange(index + 1)
           }
         })
       }
-      nextRange(firstIndex)
+      nextRange(range.firstIndex)
     })
   }
 
@@ -200,14 +196,14 @@ class CachedFile {
       this._readRange(
         start,
         end,
-        (partBuffer, bufferLength, safe) => {
+        (partBuffer, bufferLength, range) => {
           if (buffer === undefined || buffer === null) {
-            buffer = Buffer.allocUnsafe(safe.size)
+            buffer = Buffer.allocUnsafe(range.size)
           }
           partBuffer.copy(buffer, offset, 0, bufferLength)
           offset += bufferLength
         },
-        (err, endBuffer, endBufferLength, safe) => {
+        (err, endBuffer, endBufferLength) => {
           if (err) return cb2(err)
           if (buffer === undefined || buffer === null) {
             return cb2(null, endBuffer)

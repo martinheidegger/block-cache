@@ -31,7 +31,7 @@ test('stat-errors bubble', t =>
         testErr('stat', () => c.stat()),
         testErr('read', () => c.read()),
         testErr('_readCached', () => new Promise((resolve, reject) => {
-          c._readCached(0, 10, err => err ? reject(err) : resolve())
+          c._readCached({start: 0, end: 10}, err => err ? reject(err) : resolve())
         }))
       ])
     })
@@ -280,6 +280,16 @@ test('Reading a file in two parts', t =>
     }).then(buffers => {
       t.equals(buffers[0].toString(), 'wor')
       t.equals(buffers[1].toString(), 'ld')
+    })
+)
+
+test('Reading a file over multiple blocks', t =>
+  createDrive([{ name: 'hello', data: 'itstheendoftheworldasweknowit' }])
+    .then(drive => {
+      const fd = new Cache(drive).openSync('hello', {blkSize: 5})
+      return fd.read(null, undefined, 21, 2)
+    }).then(buffer => {
+      t.equals(buffer.toString(), 'stheendoftheworldaswe')
     })
 )
 
