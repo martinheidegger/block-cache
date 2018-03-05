@@ -12,7 +12,7 @@ caching more than your given memory limit.
 
 `npm i block-cache --save`
 
-### Usage
+## Usage
 
 The API of `block-cache` is comparable to the
 [`fs`](https://nodejs.org/api/fs.html) API but all callbacks are optional and
@@ -40,7 +40,7 @@ This example reads the entirety of the `./Readme.md` file into a 2 mega-byte
 cache in 1 kilo-byte sized blocks and then closes the data. Even if the fp is
 closed: the block stay in the cache!
 
-### Use-case: file parsing
+## Use-case: file parsing
 
 This library usually comes in play when you have to parse parts of a file
 depending on the header. Take the beginning of this GIF parser for example:
@@ -68,7 +68,7 @@ file at a time. Very small parts. But most of those bytes are already
 present in the cache. So, while the first operation needed to read 1Kb of
 the file, the second operation can already use it from the cached data.
 
-### API
+## API
 
 - [`Cache`](#Cache)
     - [`.open`](#cache.open)
@@ -260,6 +260,6 @@ CachedFile.DEFAULT_BLK_SIZE
 
 The default blk size used for caching.
 
-### License
+## License
 
 MIT
