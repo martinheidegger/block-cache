@@ -103,6 +103,9 @@ new Cache(fs[, opts])
     [`Cache.DEFAULT_CACHE_SIZE`](#Cache.DEFAULT_CACHE_SIZE) (integer).
 - `opts.blkSize` is the default size in bytes of a cache-block. Defaults to
     [`CachedFile.DEFAULT_BLK_SIZE`](#CachedFile.DEFAULT_BLK_SIZE). (integer).
+- `opts.prefix` is an optional prefix that can be added to the cached data,
+    useful if you want to reuse the same `opts.cache` for multiple
+    `Cache` instances. Defaults to `''`. (string)
 
 ---
 

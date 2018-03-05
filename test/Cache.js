@@ -269,3 +269,25 @@ test('reading errors bubble through', t => {
     t.end()
   })
 })
+
+test('prefixes used with custom caches', t => {
+  const fs = {
+    read (fd, buffer, offset, size, start, cb) {
+      cb()
+    }
+  }
+  const cacheImp = {
+    get: (key) => {
+      t.same(key, 'xxxy1:3')
+      return true
+    }
+  }
+  const cache = new Cache(fs, {
+    cache: cacheImp,
+    prefix: 'xxx'
+  })
+  cache._readCached(null, 'y', 1, 3, err => {
+    t.equals(err, null)
+    t.end()
+  })
+})

@@ -22,7 +22,7 @@ class Cache {
     }
 
     const read = (fp, prefix, start, end, cb) => {
-      const key = `${prefix}${start}:${end}`
+      const key = `${cacheOpts.prefix}${prefix}${start}:${end}`
       const cached = cacheOpts.cache.get(key)
       if (cached) {
         return cb(null, cached)
