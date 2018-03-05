@@ -164,20 +164,31 @@ test('two different files/ranges from the same cache', t => {
 
 test('exceeding the (custom) cache-size should drop old data', t => {
   const fs = {
-    read (fd, buffer, offset, size, start, cb) { cb() }
+    read (fd, buffer, offset, size, start, cb) {
+      // Make sure that there is random data in the block to be
+      // able to test it later
+      buffer.write(new Date().getTime().toString(32) + Math.random().toString(32))
+      cb()
+    }
   }
   const c = new Cache(fs, {cacheSize: 30})
-  const read = (path, start, end) => promisify(cb => c._readCached(null, path, start, end, cb))
+  const read = (path, start, end) => promisify(cb => c._readCached({path: path}, path, start, end, cb))
 
   return bb.mapSeries(['x', 'y', 'z'], path => read(path, 0, 15))
-    .then(([x, y, z]) =>
-      bb.mapSeries(['x', 'z', 'y'], path => read(path, 0, 15))
-        .then(([x2, z2, y2]) => {
-          t.notEqual(x2, x)
-          t.equal(z2, z)
-          t.notEqual(y2, y)
+    .then(parts => {
+      const x = parts[0]
+      const y = parts[1]
+      const z = parts[2]
+      return bb.mapSeries(['x', 'z', 'y'], path => read(path, 0, 15))
+        .then(parts2 => {
+          const x2 = parts2[0]
+          const z2 = parts2[1]
+          const y2 = parts2[2]
+          t.notEqual(x2.toString(), x.toString(), 'x should have been dropped because y & z were written after x')
+          t.notEqual(y2.toString(), y.toString(), 'y should have been dropped because x2 should have kicked it out')
+          t.equal(z2.toString(), z.toString(), 'z should have stayed the same when reading z2')
         })
-    )
+    })
 })
 
 test('custom cache is used', t => {

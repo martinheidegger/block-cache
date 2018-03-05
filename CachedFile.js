@@ -80,7 +80,9 @@ class CachedFile {
   _readRange (start, end, process, cb) {
     this._fdSize((error, fdSize) => {
       if (error) return cb(error)
-      const {size, fd, prefix} = fdSize
+      const size = fdSize.size
+      const fd = fdSize.fd
+      const prefix = fdSize.prefix
       if (start < 0 || end > size) {
         return cb(err('ERR_RANGE', `Invalid Range: ${start}:${end} of '${this.path}' (size: ${size})`))
       }
@@ -94,7 +96,10 @@ class CachedFile {
       const firstIndex = safe.start / this.blkSize | 0
       const lastIndex = (safe.end - 1) / this.blkSize | 0
       const nextRange = index => {
-        let {rangeStart, rangeEnd, rangeSize} = this.getRange(index, size)
+        const range = this.getRange(index, size)
+        const rangeEnd = range.rangeEnd
+        const rangeStart = range.rangeStart
+        let rangeSize = range.rangeSize
         if (this._closed !== undefined) return cb(err('ERR_CLOSED', `File pointer has been closed.`))
         this._reading++
         this.fsCache._readCached(fd, prefix, rangeStart, rangeEnd, (err, data) => {

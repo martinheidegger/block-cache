@@ -278,9 +278,9 @@ test('Reading a file in two parts', t =>
         promiseA,
         fd.read(undefined, 0, 2)
       ])
-    }).then(([bufferA, bufferB]) => {
-      t.equals(bufferA.toString(), 'wor')
-      t.equals(bufferB.toString(), 'ld')
+    }).then(buffers => {
+      t.equals(buffers[0].toString(), 'wor')
+      t.equals(buffers[1].toString(), 'ld')
     })
 )
 
