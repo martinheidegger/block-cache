@@ -7,7 +7,7 @@
     "test": "npm run test:lint && npm run test:unit",
     "test:lint": "standard",
     "test:unit": "tap test/*.js",
-    "test:ci": "npm run test:lint && npm run test:unit -- --cov --coverage-report=lcov && codeclimate-test-reporter < ./coverage/lcov.info",
+    "test:ci": "npm run test:lint && npm run test:unit -- --cov --coverage-report=lcov",
     "release": "standard-version"
   },
   "keywords": [
