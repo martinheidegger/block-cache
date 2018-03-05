@@ -20,7 +20,7 @@ module.exports = class Cache {
       })
     }
 
-    this._readCached = (fp, prefix, start, end, cb) => {
+    const read = (fp, prefix, start, end, cb) => {
       const key = `${prefix}${start}:${end}`
       const cached = cacheOpts.cache.get(key)
       if (cached) {
@@ -35,6 +35,23 @@ module.exports = class Cache {
       })
     }
 
+    Object.defineProperties(this, {
+      _readCached: {
+        value: read,
+        enumerable: false
+      },
+      openSync: {
+        value: (path, fileOpts) => {
+          if (!path) throw err('ERR_INVALID_ARG_TYPE', 'path required')
+          fileOpts = Object.assign({
+            blkSize: cacheOpts.blkSize
+          }, fileOpts)
+          return new CachedFile(internal, path, fileOpts)
+        },
+        enumerable: false
+      }
+    })
+
     const internal = {
       open (path, opts, cb) {
         fs.open(path, opts, cb)
@@ -45,15 +62,7 @@ module.exports = class Cache {
       close (path, cb) {
         fs.close(path, cb)
       },
-      read: this._readCached
-    }
-
-    this.openSync = (path, fileOpts) => {
-      if (!path) throw err('ERR_INVALID_ARG_TYPE', 'path required')
-      fileOpts = Object.assign({
-        blkSize: cacheOpts.blkSize
-      }, fileOpts)
-      return new CachedFile(internal, path, fileOpts)
+      read
     }
   }
 

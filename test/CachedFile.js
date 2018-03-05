@@ -7,7 +7,7 @@ const CachedFile = require('../CachedFile')
 const promisifyAsync = require('../lib/promisifyAsync')
 
 function cachedFile (drive, path, opts) {
-  return new Cache(drive).openSync(path, opts)
+  return Object.freeze(new Cache(drive).openSync(path, opts))
 }
 
 function testError (t, name, op, validate) {

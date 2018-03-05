@@ -28,14 +28,6 @@ function getSafeSize (start, end, size) {
 
 class CachedFile {
   constructor (internal, path, opts) {
-    this.position = 0
-    this._isClosed = true
-    this.blkSize = (opts && opts.blkSize) || CachedFile.DEFAULT_BLK_SIZE
-    this.stat = mem.promise(cb => internal.stat(path, cb))
-    this.size = mem.promise(cb => this.stat((err, stat) => {
-      if (err) return cb(err)
-      cb(null, sizeForStat(stat))
-    }))
     const fp = mem.promise(cb => internal.open(path, 'r', cb))
     const init = mem.props({
       fp,
@@ -43,6 +35,29 @@ class CachedFile {
         if (err) return cb(err)
         cb(null, `${path}:${stat.mtime.getTime().toString(32)}:`)
       }))
+    })
+    let position = 0
+    let _isClosed = false
+    Object.defineProperties(this, {
+      blkSize: {
+        value: (opts && opts.blkSize) || CachedFile.DEFAULT_BLK_SIZE
+      },
+      position: {
+        get: () => position,
+        set: (pos) => { position = pos }
+      },
+      _isClosed: {
+        get: () => _isClosed
+      },
+      stat: {
+        value: mem.promise(cb => internal.stat(path, cb))
+      },
+      size: {
+        value: mem.promise(cb => this.stat((err, stat) => {
+          if (err) return cb(err)
+          cb(null, sizeForStat(stat))
+        }))
+      }
     })
     let reading = 0
     let closer
@@ -59,7 +74,7 @@ class CachedFile {
       })
     }
     this.close = mem.promise(cb => {
-      this._isClosed = true
+      _isClosed = true
       fp((err, fp) => {
         if (err) return cb(err)
         const noReader = () => {
@@ -108,11 +123,7 @@ class CachedFile {
         const rangeEnd = range.rangeEnd
         const rangeStart = range.rangeStart
         let rangeSize = range.rangeSize
-        if (this._closed !== undefined) return cb(err('ERR_CLOSED', `File pointer has been closed.`))
-        this._reading++
         this._readCached(rangeStart, rangeEnd, (err, data) => {
-          this._reading--
-          if (this._closed !== undefined) this._closed()
           if (err) return cb(err)
           let rightCut = rangeSize
           let leftCut = 0
@@ -141,7 +152,7 @@ class CachedFile {
   }
 
   createReadStream (opts) {
-    if (this._closed) {
+    if (this._isClosed) {
       throw err('ERR_CLOSED', 'File pointer has been closed.')
     }
     const stream = new Readable({read: () => {}})
