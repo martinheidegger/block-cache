@@ -261,6 +261,10 @@ CachedFile.DEFAULT_BLK_SIZE
 
 The default `opts.blkSize` used for caching: 512 (integer, equals 512 Byte).
 
+## Acknowledgement
+
+This project was made for and supported by [dotloom](https://github.com/dotloom).
+
 ## License
 
 MIT
