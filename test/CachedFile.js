@@ -7,7 +7,7 @@ const CachedFile = require('../CachedFile')
 const promisifyAsync = require('../lib/promisifyAsync')
 
 function cachedFile (drive, path, opts) {
-  return new CachedFile(new Cache(drive), path, opts)
+  return new Cache(drive).openSync(path, opts)
 }
 
 function testError (t, name, op, validate) {
@@ -29,8 +29,10 @@ test('stat-errors bubble', t =>
       return Promise.all([
         testErr('size', () => c.size()),
         testErr('stat', () => c.stat()),
-        testErr('fd', () => c.fd()),
-        testErr('read', () => c.read())
+        testErr('read', () => c.read()),
+        testErr('_readCached', () => new Promise((resolve, reject) => {
+          c._readCached(0, 10, err => err ? reject(err) : resolve())
+        }))
       ])
     })
 )
@@ -44,11 +46,9 @@ test('fd-errors bubble', t =>
       const testErr = (name, op) => testError(t, name, op, (err) => t.equals(err.message, 'custom - open - error', `error thrown during ${op}`))
       const c = cachedFile(drive, 'hello')
       return Promise.all([
-        testErr('fd', () => c.fd()),
         testErr('close', () => c.close()),
         c.stat(),
-        c.size(),
-        c.prefix()
+        c.size()
       ])
     })
 )
@@ -73,15 +73,14 @@ test('read-errors bubble', t =>
           })
         }),
         c.stat(),
-        c.size(),
-        c.fd()
+        c.size()
       ])
     })
 )
 
 test('default block size', t => {
   t.equals(CachedFile.DEFAULT_BLK_SIZE, 512)
-  const c = cachedFile({open: noop, stat: noop})
+  const c = cachedFile(require('fs'), './Readme.md', {open: noop, stat: noop})
   t.equals(c.blkSize, CachedFile.DEFAULT_BLK_SIZE)
   t.end()
 })
@@ -238,10 +237,10 @@ test('closing while reading', t =>
         }
       })
       drive.read = (fd, buffer, offset, length, position, cb) => {
-        fdA.fd(() => {
+        setImmediate(() => {
           fdA.close(closed)
           setImmediate(() => {
-            t.notEqual(fdA._closed, undefined)
+            t.equal(fdA._isClosed, true)
             drive._read(fd, buffer, offset, length, position, cb)
           })
         })

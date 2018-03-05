@@ -10,6 +10,9 @@ an in-memory lru-cache. This is useful if you want to process a file, reusing
 previously downloaded parts and improving the general performance without
 caching more than your given memory limit.
 
+The cache does not expose the passed-in API at any point which makes it
+suitable as a Sandbox.
+
 `npm i block-cache --save`
 
 ## Usage
@@ -78,10 +81,8 @@ the file, the second operation can already use it from the cached data.
 - [`CachedFile`](#CachedFile)
     - [`.read`](#cachedFile.read)
     - [`.createReadStream`](#cachedFile.createReadStream)
-    - [`.fd`](#cachedFile.fd)
     - [`.size`](#cachedFile.size)
     - [`.stat`](#cachedFile.stat)
-    - [`.prefix`](#cachedFile.prefix)
     - [`DEFAULT_BLK_SIZE`](#CachedFile.DEFAULT_BLK_SIZE)
 
 ---
@@ -165,7 +166,7 @@ through a stream.
 
 - `path` is the path to read the file from (string).
 - `opts.blkSize` is the block size for each block to be cached. Defaults
-    to [`CachedFile.DEFAULT_BLK_SIZE`](#CachedFile.DEFAULT_BLK_SIZE). (integer).
+    to [`cache.opts.blkSize`](#Cache). (integer).
 - `opts.start` is the start from while to read the file. Defaults to 0. (integer)
 - `opts.end` is the end until which to read the file. Defaults to the end of
     the file. (integer)
@@ -179,13 +180,22 @@ new CachedFile(cache, path[, opts])
 ```
 
 Creates a new instance for reading one file. The blocks will still be stored in
-the passed-in `cache` object.
+the passed-in `cache` object. While it is possible to instantiate a new
+`CachedFile`, you can not pass-in a cache directly, use the
+[`.open`](#cache.open), [`.openSync`](#cache.openSync) or
+[`.createReadStream](#cache.createReadStream) to interact with the cace
 
-- `cache` is a [`Cache`](#Cache) instance.
-- `path` is the path to read the file from (string).
+- `cacheInternal` a subset of the `Cache` API that is not accessible from
+    outside.
+- `cacheInternal.open(path, opts, cb)` opens a file pointer to a given `path`
+    on the underlying `fs`.
+- `cacheInternal.stat(path, cb)` receives the `stat` file from the underlying
+   `fs`
+- `cacheInternal.close(fp, cb)` closes a file pointer on the underlying `fs`.
+- `cacheInternal.read(fp, prefix, start, end, cb)` reads bytes from the
+    underlying `fs` into a buffer.
 - `opts.blkSize` specifies the block size for this file pointer (integer).
-    Defaults to `cache.opts.blkSize` or to
-    [`CachedFile.DEFAULT_BLK_SIZE`](#CachedFile.DEFAULT_BLK_SIZE).
+    Defaults to [`CachedFile.DEFAULT_BLK_SIZE`](#CachedFile.DEFAULT_BLK_SIZE).
 
 ---
 
@@ -210,16 +220,6 @@ to pass a descriptor.
 
 ---
 
-<a name="cachedFile.fd"></a>
-
-```javascript
-cachedFile.fd([cb])
-```
-
-Retreives the actual file descriptor for that path on the file system.
-
----
-
 <a name="cachedFile.size"></a>
 
 ```javascript
@@ -227,16 +227,6 @@ cachedFile.size([cb])
 ```
 
 The size of the file as noted in the file descriptor.
-
----
-
-<a name="cachedFile.prefix"></a>
-
-```javascript
-cachedFile.prefix([cb])
-```
-
-The prefix for ranges of the file stored in cache.
 
 ---
 

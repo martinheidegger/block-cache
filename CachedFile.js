@@ -27,43 +27,54 @@ function getSafeSize (start, end, size) {
 }
 
 class CachedFile {
-  constructor (fsCache, path, opts) {
-    this.fsCache = fsCache
-    this.path = path
+  constructor (internal, path, opts) {
     this.position = 0
-    this._reading = 0
-    this.blkSize = (opts && opts.blkSize) || fsCache.opts.blkSize || CachedFile.DEFAULT_BLK_SIZE
-    this.fd = mem.promise(cb => fsCache.fs.open(path, 'r', cb))
-    this.stat = mem.promise(cb => fsCache.fs.stat(path, cb))
-    this.prefix = mem.promise(cb => this.stat((err, stat) => {
-      if (err) return cb(err)
-      cb(null, `${path}:${stat.mtime.getTime().toString(32)}:`)
-    }))
+    this._isClosed = true
+    this.blkSize = (opts && opts.blkSize) || CachedFile.DEFAULT_BLK_SIZE
+    this.stat = mem.promise(cb => internal.stat(path, cb))
     this.size = mem.promise(cb => this.stat((err, stat) => {
       if (err) return cb(err)
       cb(null, sizeForStat(stat))
     }))
-    this._fdSize = mem.props({
-      fd: this.fd,
-      size: this.size,
-      prefix: this.prefix
+    const fp = mem.promise(cb => internal.open(path, 'r', cb))
+    const init = mem.props({
+      fp,
+      prefix: mem.promise(cb => this.stat((err, stat) => {
+        if (err) return cb(err)
+        cb(null, `${path}:${stat.mtime.getTime().toString(32)}:`)
+      }))
     })
-    this.close = mem.promise(cb =>
-      this.fd((err, fd) => {
+    let reading = 0
+    let closer
+    this._readCached = (rangeStart, rangeEnd, cb) => {
+      init((error, parts) => {
+        if (error) return cb(error)
+        if (closer !== undefined) return cb(err('ERR_CLOSED', `File pointer has been closed.`))
+        reading++
+        internal.read(parts.fp, parts.prefix, rangeStart, rangeEnd, (err, data) => {
+          reading--
+          if (closer !== undefined) closer()
+          cb(err, data)
+        })
+      })
+    }
+    this.close = mem.promise(cb => {
+      this._isClosed = true
+      fp((err, fp) => {
         if (err) return cb(err)
         const noReader = () => {
-          this.fsCache.fs.close(fd, cb)
+          internal.close(fp, cb)
         }
         const check = () => {
-          if (this._reading === 0) {
-            this._closed = () => {}
+          if (reading === 0) {
+            closer = () => {}
             noReader()
           }
         }
-        this._closed = check
+        closer = check
         check()
       })
-    )
+    })
   }
 
   getRange (rangeIndex, size) {
@@ -78,13 +89,10 @@ class CachedFile {
   }
 
   _readRange (start, end, process, cb) {
-    this._fdSize((error, fdSize) => {
+    this.size((error, size) => {
       if (error) return cb(error)
-      const size = fdSize.size
-      const fd = fdSize.fd
-      const prefix = fdSize.prefix
       if (start < 0 || end > size) {
-        return cb(err('ERR_RANGE', `Invalid Range: ${start}:${end} of '${this.path}' (size: ${size})`))
+        return cb(err('ERR_RANGE', `Invalid Range: ${start}:${end} (size: ${size})`))
       }
       if (end !== null && end !== undefined && end < start) {
         return cb(err('ERR_RANGE', `Invalid Range: start(${start}) is after end(${end})`))
@@ -102,7 +110,7 @@ class CachedFile {
         let rangeSize = range.rangeSize
         if (this._closed !== undefined) return cb(err('ERR_CLOSED', `File pointer has been closed.`))
         this._reading++
-        this.fsCache._readCached(fd, prefix, rangeStart, rangeEnd, (err, data) => {
+        this._readCached(rangeStart, rangeEnd, (err, data) => {
           this._reading--
           if (this._closed !== undefined) this._closed()
           if (err) return cb(err)
