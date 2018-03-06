@@ -75,12 +75,14 @@ the file, the second operation can already use it from the cached data.
 
 - [`Cache`](#Cache)
     - [`.open`](#cache.open)
+    - [`.close`](#cache.close)
     - [`.disconnect`](#cache.disconnect)
     - [`.openSync`](#cache.openSync)
     - [`.read`](#cache.read)
     - [`.createReadStream`](#cache.createReadStream)
     - [`DEFAULT_CACHE_SIZE`](#Cache.DEFAULT_CACHE_SIZE)
 - [`CachedFile`](#CachedFile)
+    - [`.close`](#cachedFile.close)
     - [`.read`](#cachedFile.read)
     - [`.createReadStream`](#cachedFile.createReadStream)
     - [`.size`](#cachedFile.size)
@@ -123,6 +125,22 @@ the file reference in `r` mode.
 - `opts.blkSize` is the size in bytes of a cache-block. Defaults to the
     `opts.blkSize` defined in the `Cache`.
 - `cb(Error, CachedFile)` is an optional async callback handler method.
+    The method will return a `Promise` if the callback is not defined.
+
+---
+
+<a name="cache.close"></a>
+
+```javascript
+cache.close(fp[, cb])
+```
+
+Closes a created file pointer reference. After closing, future requests
+on the `CachedFile` will result in an `err.code === 'ERR_CLOSED` error.
+
+- `fp` is a [`CachedFile`](#CachedFile) instance, created
+    with [`.open`](#cache.open) or [`.openSync`](#cache.openSync)
+- `cb(Error)` is an optional async callback handler method.
     The method will return a `Promise` if the callback is not defined.
 
 ---
@@ -224,6 +242,20 @@ the passed-in `cache` object. While it is possible to instantiate a new
     underlying `fs` into a buffer.
 - `opts.blkSize` specifies the block size for this file pointer (integer).
     Defaults to [`CachedFile.DEFAULT_BLK_SIZE`](#CachedFile.DEFAULT_BLK_SIZE).
+
+---
+
+<a name="cachedFile.close"></a>
+
+```javascript
+cachedFile.close([cb])
+```
+
+Closes the instance. After closing, future requests
+on the `CachedFile` will result in an `err.code === 'ERR_CLOSED` error.
+
+- `cb(Error)` is an optional async callback handler method.
+    The method will return a `Promise` if the callback is not defined.
 
 ---
 
