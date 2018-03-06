@@ -154,7 +154,7 @@ cache.disconnect()
 Disconnects the cache from the file system instance. Any future operations on
 the Cache or CachedFile instances create with the Cache  will result in
 an `err.code === 'ERR_DISCONNECTED'` error. Disconnect also closes all open
-file pointer references on the underlying file system.
+file pointer references on the underlying file system.  
 
 ---
 
@@ -229,7 +229,7 @@ Creates a new instance for reading one file. The blocks will still be stored in
 the passed-in `cache` object. While it is possible to instantiate a new
 `CachedFile`, you can not pass-in a cache directly, use the
 [`.open`](#cache.open), [`.openSync`](#cache.openSync) or
-[`.createReadStream](#cache.createReadStream) to interact with the cace
+[`.createReadStream`](#cache.createReadStream) to interact with the cache
 
 - `cacheInternal` a subset of the `Cache` API that is not accessible from
     outside.
