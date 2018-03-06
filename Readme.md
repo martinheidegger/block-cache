@@ -75,6 +75,7 @@ the file, the second operation can already use it from the cached data.
 
 - [`Cache`](#Cache)
     - [`.open`](#cache.open)
+    - [`.disconnect`](#cache.disconnect)
     - [`.openSync`](#cache.openSync)
     - [`.read`](#cache.read)
     - [`.createReadStream`](#cache.createReadStream)
@@ -123,6 +124,19 @@ the file reference in `r` mode.
     `opts.blkSize` defined in the `Cache`.
 - `cb(Error, CachedFile)` is an optional async callback handler method.
     The method will return a `Promise` if the callback is not defined.
+
+---
+
+<a name="cache.disconnect"></a>
+
+```javascript
+cache.disconnect()
+```
+
+Disconnects the cache from the file system instance. Any future operations on
+the Cache or CachedFile instances create with the Cache  will result in
+an `err.code === 'ERR_DISCONNECTED'` error. Disconnect also closes all open
+file pointer references on the underlying file system.
 
 ---
 

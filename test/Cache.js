@@ -151,6 +151,133 @@ test('convenience API: read cb', t =>
     })
 )
 
+test('disconnecting should result in disconnected errors', t =>
+  createDrive([{ name: 'hello', data: 'world' }])
+    .then(drive => {
+      const c = new Cache(drive)
+      const fp = c.openSync('hello', {blkSize: 1})
+      return fp.read(undefined, undefined, 3, 0)
+        .then(() => {
+          c.disconnect()
+          const checkDisconnected = (name, op) =>
+            Promise.resolve()
+              .then(op)
+              .then(() => t.fail(`'${name}' ran through even though disconnected`))
+              .catch(err => {
+                t.equals(err.code, 'ERR_DISCONNECTED', `'${name}' should be disconnected`)
+              })
+          const fp2 = c.openSync('holla', {blksize: 2})
+          return Promise.all([
+            checkDisconnected('createReadStream', () => new Promise((resolve, reject) => {
+              const stream = fp2.createReadStream()
+              stream.on('error', reject)
+              stream.on('end', resolve)
+            })),
+            checkDisconnected('fp.read', () => fp.read(undefined, undefined, 3, 2)),
+            checkDisconnected('fp.close', () => fp.close()),
+            checkDisconnected('fp2.read', () => fp2.read()),
+            checkDisconnected('fp2.stat', () => fp2.stat()),
+            checkDisconnected('fp2.close', () => fp2.close())
+          ])
+        })
+    })
+)
+
+test('disconnecting should close open file pointers', t => {
+  let closeCalled = 0
+  let openCalled = 0
+  let statCalled = 0
+  const fs = {
+    open (path, opts, cb) {
+      setImmediate(() => {
+        openCalled += 1
+        cb(null, openCalled)
+      })
+    },
+    stat (path, cb) {
+      statCalled += 1
+      cb(null, { mtime: new Date() })
+    },
+    close (fp, cb) {
+      closeCalled += 1
+      setImmediate(() => cb(null))
+    },
+    read (fp, buffer, position, size, start, cb) {
+      setImmediate(() => cb(null))
+    }
+  }
+  const c = new Cache(fs)
+  return Promise.all([
+    // make sure that the request to open is actually triggered
+    c.openSync('hello').read(),
+    c.openSync('hello2').read()
+  ])
+    .then(() => {
+      return Promise.all([
+        c.openSync('hello').read()
+          .then(() => t.fail('Second read shouldnt work'))
+          .catch(err => t.equals(err.code, 'ERR_DISCONNECTED', 'Second read should be assumed disconnected')),
+        Promise.resolve()
+          .then(() => c.disconnect())
+      ])
+    })
+    .then(() => {
+      t.equals(openCalled, 3, 'Making sure that the file was actually opened')
+      t.equals(statCalled, 3, 'Making sure that the stat was called too')
+      t.equals(closeCalled, 3, 'The file should have been closed by disconnect')
+    })
+})
+
+test('disconnecting should pass errors when closing files', t => {
+  const fs = {
+    open (path, opts, cb) {
+      setImmediate(() => cb(null))
+    },
+    stat (path, cb) {
+      cb(null, { mtime: new Date() })
+    },
+    close (fp, cb) {
+      setImmediate(() => cb(new Error('test')))
+    },
+    read (fp, buffer, position, size, start, cb) {
+      setImmediate(() => cb(null))
+    }
+  }
+  const c = new Cache(fs)
+  return Promise.all([
+    // make sure that the request to open is actually triggered
+    c.openSync('hello').read(),
+    c.openSync('hello2').read()
+  ])
+    .then(() => c.disconnect())
+    .then(() => t.fail('Disconnecting should result in an error'))
+    .catch(errors => {
+      t.type(errors, Array, 'The errors should be returned as array')
+      t.equals(errors.length, 2, '')
+      t.equals(errors[0].message, 'test', 'Making sure that the error is passed-through')
+      t.equals(errors[1].message, 'test', 'Making sure that the error is passed-through')
+    })
+})
+
+test('disconnecting should pass errors when closing files', t => {
+  const fs = {
+    open (path, opts, cb) {
+      setImmediate(() => cb(null))
+    },
+    stat (path, cb) {
+      cb(null, { mtime: new Date() })
+    },
+    close (fp, cb) {
+      setImmediate(() => cb(new Error('test')))
+    },
+    read (fp, buffer, position, size, start, cb) {
+      setImmediate(() => cb(null))
+    }
+  }
+  const c = new Cache(fs)
+  return c.disconnect()
+})
+
 test('reading a file', t => {
   const fs = {
     read (fd, buffer, offset, size, start, cb) {
