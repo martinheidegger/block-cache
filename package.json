@@ -1,6 +1,6 @@
 {
   "name": "block-cache",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "fs read (incl. stream) operations cached in an lru-cache for consistent memory usage with custom fs support (hyperdrive).",
   "main": "index.js",
   "scripts": {
